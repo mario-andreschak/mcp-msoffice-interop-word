@@ -23,6 +23,7 @@ import { registerTableTools } from "./tools/table-tools.js";
 import { registerImageTools } from "./tools/image-tools.js";
 import { registerHeaderFooterTools } from "./tools/header-footer-tools.js";
 import { registerPageSetupTools } from "./tools/page-setup-tools.js";
+import { registerCursorSelectionTools } from "./tools/cursor-selection-tools.js";
 // Import other tool/resource registration functions here
 
 registerDocumentTools(mcpServer);
@@ -32,6 +33,7 @@ registerTableTools(mcpServer);
 registerImageTools(mcpServer);
 registerHeaderFooterTools(mcpServer);
 registerPageSetupTools(mcpServer);
+registerCursorSelectionTools(mcpServer);
 // Call other registration functions here
 // mcpServer.resource(...)
 

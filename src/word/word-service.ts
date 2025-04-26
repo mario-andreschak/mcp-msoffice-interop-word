@@ -36,8 +36,15 @@ class WordService {
   public async getWordApplication(): Promise<WordApplication> {
     if (this.wordApp) {
       try {
-        // Check if the instance is still valid
-        this.wordApp.Visible; // Accessing a property to check liveness
+        // More comprehensive check for instance validity
+        // Check basic property access
+        this.wordApp.Visible;
+        
+        // Check if Documents collection is accessible and valid
+        const docs = this.wordApp.Documents;
+        // Try to access a property of Documents to ensure it's fully valid
+        const count = docs.Count;
+        
         return this.wordApp;
       } catch (error) {
         console.warn("Existing Word instance seems invalid, creating a new one.", error);
@@ -463,7 +470,7 @@ class WordService {
       if (tableIndex <= 0 || tableIndex > doc.Tables.Count) {
         throw new Error(`Table index ${tableIndex} is out of bounds.`);
       }
-      const table = doc.Tables(tableIndex);
+      const table = doc.Tables.Item(tableIndex);
       const cell = table.Cell(rowIndex, colIndex);
       return cell;
     } catch (error) {
@@ -500,13 +507,13 @@ class WordService {
           if (tableIndex <= 0 || tableIndex > doc.Tables.Count) {
               throw new Error(`Table index ${tableIndex} is out of bounds.`);
           }
-          const table = doc.Tables(tableIndex);
+          const table = doc.Tables.Item(tableIndex);
           let newRow;
           if (beforeRowIndex !== undefined) {
               if (beforeRowIndex <= 0 || beforeRowIndex > table.Rows.Count + 1) { // Allow inserting after last row
                  throw new Error(`Row index ${beforeRowIndex} is out of bounds for insertion.`);
               }
-              const refRow = beforeRowIndex <= table.Rows.Count ? table.Rows(beforeRowIndex) : undefined;
+              const refRow = beforeRowIndex <= table.Rows.Count ? table.Rows.Item(beforeRowIndex) : undefined;
               newRow = table.Rows.Add(refRow); // Inserts before refRow if provided, otherwise adds at end
           } else {
               newRow = table.Rows.Add(); // Add to the end
@@ -529,13 +536,13 @@ class WordService {
           if (tableIndex <= 0 || tableIndex > doc.Tables.Count) {
               throw new Error(`Table index ${tableIndex} is out of bounds.`);
           }
-          const table = doc.Tables(tableIndex);
+          const table = doc.Tables.Item(tableIndex);
            let newCol;
           if (beforeColIndex !== undefined) {
                if (beforeColIndex <= 0 || beforeColIndex > table.Columns.Count + 1) { // Allow inserting after last col
                  throw new Error(`Column index ${beforeColIndex} is out of bounds for insertion.`);
               }
-              const refCol = beforeColIndex <= table.Columns.Count ? table.Columns(beforeColIndex) : undefined;
+              const refCol = beforeColIndex <= table.Columns.Count ? table.Columns.Item(beforeColIndex) : undefined;
               newCol = table.Columns.Add(refCol); // Inserts before refCol if provided, otherwise adds at end
           } else {
               newCol = table.Columns.Add(); // Add to the end (right)
@@ -559,7 +566,7 @@ class WordService {
           if (tableIndex <= 0 || tableIndex > doc.Tables.Count) {
               throw new Error(`Table index ${tableIndex} is out of bounds.`);
           }
-          const table = doc.Tables(tableIndex);
+          const table = doc.Tables.Item(tableIndex);
           // WdTableFormatApply flags can be combined (e.g., Borders | Shading | Font | Color | AutoFit | HeadingRows | FirstColumn | LastColumn | LastRow)
           // Example: wdTableFormatApplyBorders = 1, wdTableFormatApplyShading = 2, etc.
           // Default apply flags might vary, check Word documentation. Let's assume applying all is reasonable if not specified.
@@ -605,7 +612,7 @@ class WordService {
           if (shapeIndex <= 0 || shapeIndex > doc.InlineShapes.Count) {
               throw new Error(`InlineShape index ${shapeIndex} is out of bounds.`);
           }
-          const shape = doc.InlineShapes(shapeIndex);
+          const shape = doc.InlineShapes.Item(shapeIndex);
 
           // Store original aspect ratio if needed
           const originalHeight = shape.Height;
@@ -659,7 +666,7 @@ class WordService {
           if (sectionIndex <= 0 || sectionIndex > doc.Sections.Count) {
               throw new Error(`Section index ${sectionIndex} is out of bounds.`);
           }
-          const section = doc.Sections(sectionIndex);
+          const section = doc.Sections.Item(sectionIndex);
           const headersFooters = isHeader ? section.Headers : section.Footers;
 
           // WdHeaderFooterIndex: wdHeaderFooterPrimary = 1, wdHeaderFooterFirstPage = 2, wdHeaderFooterEvenPages = 3
@@ -667,7 +674,7 @@ class WordService {
              throw new Error(`Invalid header/footer type: ${headerFooterType}. Use 1, 2, or 3.`);
           }
 
-          const headerFooter = headersFooters(headerFooterType);
+          const headerFooter = headersFooters.Item(headerFooterType);
           if (!headerFooter?.Exists) {
              // Depending on settings (like DifferentFirstPage, DifferentOddAndEvenPages), the requested type might not exist.
              // Handle this gracefully, maybe return null or throw a specific error.
@@ -750,6 +757,148 @@ class WordService {
           console.error("Failed to set paper size:", error);
           throw new Error(`Failed to set paper size. Error: ${error}`);
       }
+  }
+
+  // --- Cursor/Selection Methods ---
+
+  /**
+   * Moves the cursor to the start of the document.
+   */
+  public async moveCursorToStart(): Promise<void> {
+    const app = await this.getWordApplication();
+    try {
+      const selection = app.ActiveDocument.ActiveWindow.Selection;
+      selection.HomeKey(6); // wdStory = 6
+    } catch (error) {
+      console.error("Failed to move cursor to start:", error);
+      throw new Error(`Failed to move cursor to start. Error: ${error}`);
+    }
+  }
+
+  /**
+   * Moves the cursor to the end of the document.
+   */
+  public async moveCursorToEnd(): Promise<void> {
+    const app = await this.getWordApplication();
+    try {
+      const selection = app.ActiveDocument.ActiveWindow.Selection;
+      selection.EndKey(6); // wdStory = 6
+    } catch (error) {
+      console.error("Failed to move cursor to end:", error);
+      throw new Error(`Failed to move cursor to end. Error: ${error}`);
+    }
+  }
+
+  /**
+   * Moves the cursor by the specified unit and count.
+   * @param unit WdUnits enum value (e.g., 1=Character, 2=Word, 3=Sentence, etc.)
+   * @param count Number of units to move. Positive moves forward, negative moves backward.
+   * @param extend Whether to extend the selection (true) or move the insertion point (false).
+   */
+  public async moveCursor(unit: number, count: number, extend: boolean = false): Promise<void> {
+    const app = await this.getWordApplication();
+    try {
+      const selection = app.ActiveDocument.ActiveWindow.Selection;
+      // WdUnits: wdCharacter = 1, wdWord = 2, wdSentence = 3, wdParagraph = 4, wdLine = 5, wdStory = 6, etc.
+      if (extend) {
+        selection.MoveRight(unit, count, 1); // 1 = wdExtend
+      } else {
+        selection.MoveRight(unit, count, 0); // 0 = wdMove
+      }
+    } catch (error) {
+      console.error("Failed to move cursor:", error);
+      throw new Error(`Failed to move cursor. Error: ${error}`);
+    }
+  }
+
+  /**
+   * Selects the entire document.
+   */
+  public async selectAll(): Promise<void> {
+    const app = await this.getWordApplication();
+    try {
+      const selection = app.ActiveDocument.ActiveWindow.Selection;
+      selection.WholeStory();
+    } catch (error) {
+      console.error("Failed to select all:", error);
+      throw new Error(`Failed to select all. Error: ${error}`);
+    }
+  }
+
+  /**
+   * Selects a specific paragraph by index.
+   * @param paragraphIndex 1-based index of the paragraph to select.
+   */
+  public async selectParagraph(paragraphIndex: number): Promise<void> {
+    const doc = await this.getActiveDocument();
+    try {
+      if (paragraphIndex <= 0 || paragraphIndex > doc.Paragraphs.Count) {
+        throw new Error(`Paragraph index ${paragraphIndex} is out of bounds.`);
+      }
+      const paragraph = doc.Paragraphs.Item(paragraphIndex);
+      paragraph.Range.Select();
+    } catch (error) {
+      console.error(`Failed to select paragraph ${paragraphIndex}:`, error);
+      throw new Error(`Failed to select paragraph. Error: ${error}`);
+    }
+  }
+
+  /**
+   * Collapses the current selection to its start or end point.
+   * @param toStart If true, collapse to start; if false, collapse to end.
+   */
+  public async collapseSelection(toStart: boolean = true): Promise<void> {
+    const app = await this.getWordApplication();
+    try {
+      const selection = app.ActiveDocument.ActiveWindow.Selection;
+      // WdCollapseDirection: wdCollapseStart = 1, wdCollapseEnd = 0
+      selection.Collapse(toStart ? 1 : 0);
+    } catch (error) {
+      console.error("Failed to collapse selection:", error);
+      throw new Error(`Failed to collapse selection. Error: ${error}`);
+    }
+  }
+
+  /**
+   * Gets the current selection text.
+   * @returns The text of the current selection.
+   */
+  public async getSelectionText(): Promise<string> {
+    const app = await this.getWordApplication();
+    try {
+      const selection = app.ActiveDocument.ActiveWindow.Selection;
+      return selection.Text;
+    } catch (error) {
+      console.error("Failed to get selection text:", error);
+      throw new Error(`Failed to get selection text. Error: ${error}`);
+    }
+  }
+
+  /**
+   * Gets information about the current selection.
+   * @returns Object with selection information.
+   */
+  public async getSelectionInfo(): Promise<{
+    text: string;
+    start: number;
+    end: number;
+    isActive: boolean;
+    type: number;
+  }> {
+    const app = await this.getWordApplication();
+    try {
+      const selection = app.ActiveDocument.ActiveWindow.Selection;
+      return {
+        text: selection.Text,
+        start: selection.Start,
+        end: selection.End,
+        isActive: selection.Type !== 0, // wdSelectionNone = 0
+        type: selection.Type,
+      };
+    } catch (error) {
+      console.error("Failed to get selection info:", error);
+      throw new Error(`Failed to get selection info. Error: ${error}`);
+    }
   }
 
   // --- Add more methods for other Word operations ---
