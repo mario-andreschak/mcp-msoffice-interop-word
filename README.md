@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/mario-andreschak-mcp-msoffice-interop-word-badge.png)](https://mseep.ai/app/mario-andreschak-mcp-msoffice-interop-word)
+
 # MCP Office Interop Word Server
 
 This project implements a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that allows interaction with Microsoft Word documents using COM Interop on Windows.
