@@ -1,0 +1,36 @@
+name: CI
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Current npm supports Visual Studio 2026 on Node 22 and 24
+        run: npm install --global npm@11.19.1
+      - run: npm ci --foreground-scripts
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:protocol
+      - run: npm audit --omit=dev
+      - name: Installed production artifact
+        run: npm run test:package
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: docker build -t mcp-word-check .
+      - run: node scripts/verify-docker.mjs

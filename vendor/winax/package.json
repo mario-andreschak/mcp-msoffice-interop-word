@@ -1,0 +1,9 @@
+{
+  "name": "winax",
+  "version": "3.6.9-mcp.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.js",
+  "license": "MIT",
+  "description": "Vendored upstream Windows COM runtime with Node22 HolderV2 feature-detection repair"
+}
